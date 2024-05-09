@@ -8,19 +8,27 @@ using System.Web.Http;
 using UserManagement.Data.Models;
 using UserManagement.Services;
 using UserManagement.Data.Repositories;
+using System.Resources;
+using System.Runtime.Remoting.Messaging;
+using UserManagement.Resources;
+using AutoMapper;
+using UserManagement.DTOs;
 
 namespace UserManagement.Controllers
 {
 
     [Authorize]
+    [RoutePrefix("api")]
     public class UsersController : ApiController
     {
 
-        private readonly IUserRepository _userRepository;
+        private readonly UserService _userService;
+        private readonly ResourceManager _resourceManager;
 
         public UsersController()
         {
-            _userRepository = new UserRepository();
+            _resourceManager = new ResourceManager(typeof(Messages));
+            _userService = new UserService();
         }
 
         // GET api/user
@@ -28,17 +36,26 @@ namespace UserManagement.Controllers
         /// Retrieves all users.
         /// </summary>
         [HttpGet]
-        [Route("api/users")]
-        public HttpResponseMessage Get()
+        [Route("users")]
+        public HttpResponseMessage Get(string language = "en")
         {
-            var users = _userRepository.GetAll();
-            if (users != null)
+            try
             {
-                return Request.CreateResponse(HttpStatusCode.OK, users);
+                var users = _userService.GetAllUsers();
+                if (users != null)
+                {
+                    return Request.CreateResponse(HttpStatusCode.OK, users);
+                }
+                else
+                {
+                    string message = _resourceManager.GetString("UsersNotFound", new System.Globalization.CultureInfo(language));
+                    return Request.CreateErrorResponse(HttpStatusCode.NotFound, message);
+                }
             }
-            else
+            catch 
             {
-                return Request.CreateErrorResponse(HttpStatusCode.NotFound, $"Users not found.");
+                string message = _resourceManager.GetString("InternalServerError", new System.Globalization.CultureInfo(language));
+                return Request.CreateErrorResponse(HttpStatusCode.InternalServerError, message);
             }
         }
 
@@ -47,18 +64,28 @@ namespace UserManagement.Controllers
         /// Retrieves a user by ID.
         /// </summary>
         [HttpGet]
-        [Route("api/user/{id}")]
-        public HttpResponseMessage Get(int id)
+        [Route("user/{id}")]
+        public HttpResponseMessage Get(int id, string language = "en")
         {
-            var user = _userRepository.GetById(id);
-            if (user != null)
+            try
             {
-                return Request.CreateResponse(HttpStatusCode.OK, user);
+                var user = _userService.GetUserById(id);
+                if (user != null)
+                {
+                    return Request.CreateResponse(HttpStatusCode.OK, user);
+                }
+                else
+                {
+                    string message = string.Format(_resourceManager.GetString("UserNotFound", new System.Globalization.CultureInfo(language)), id);
+                    return Request.CreateErrorResponse(HttpStatusCode.NotFound, message);
+                }
             }
-            else
+            catch
             {
-                return Request.CreateErrorResponse(HttpStatusCode.NotFound, $"User with id {id} not found.");
+                string message = _resourceManager.GetString("InternalServerError", new System.Globalization.CultureInfo(language));
+                return Request.CreateErrorResponse(HttpStatusCode.InternalServerError, message);
             }
+
         }
 
         // POST api/user
@@ -66,19 +93,27 @@ namespace UserManagement.Controllers
         /// Creates a new user.
         /// </summary>
         [HttpPost]
-        [Route("api/user")]
-        public HttpResponseMessage Post([FromBody] User user)
+        [Route("user")]
+        public HttpResponseMessage Post([FromBody] User user, string language = "en")
         {
             try
             {
-                _userRepository.Add(user);
+                _userService.AddUser(user);
                 var response = Request.CreateResponse(HttpStatusCode.Created, user);
                 response.Headers.Location = new Uri(Url.Link("DefaultApi", new { id = user.Id }));
+                string message = _resourceManager.GetString("UserCreated");
+                response.Content = new StringContent(message);
                 return response;
             }
             catch (ArgumentException ex)
             {
-                return Request.CreateErrorResponse(HttpStatusCode.BadRequest, ex.Message);
+                string message = _resourceManager.GetString("BadRequest", new System.Globalization.CultureInfo(language));
+                return Request.CreateErrorResponse(HttpStatusCode.BadRequest, message, ex);
+            }
+            catch
+            {
+                string message = _resourceManager.GetString("InternalServerError", new System.Globalization.CultureInfo(language));
+                return Request.CreateErrorResponse(HttpStatusCode.InternalServerError, message);
             }
         }
 
@@ -87,18 +122,25 @@ namespace UserManagement.Controllers
         /// Updates an existing user.
         /// </summary>
         [HttpPut]
-        [Route("api/user/{id}")]
-        public HttpResponseMessage Put(int id, [FromBody] User user)
+        [Route("user/{id}")]
+        public HttpResponseMessage Put(int id, [FromBody] User user, string language = "en")
         {
             try
             {
-                user.Id = id; // Ensure that the user ID in the body matches the ID in the URL
-                _userRepository.Update(user);
-                return Request.CreateResponse(HttpStatusCode.OK);
+                user.Id = id;
+                _userService.UpdateUser(user);
+                string message = _resourceManager.GetString("UserUpdated", new System.Globalization.CultureInfo(language));
+                return Request.CreateResponse(HttpStatusCode.OK, message);
             }
             catch (ArgumentException ex)
             {
-                return Request.CreateErrorResponse(HttpStatusCode.BadRequest, ex.Message);
+                string message = _resourceManager.GetString("BadRequest", new System.Globalization.CultureInfo(language));
+                return Request.CreateErrorResponse(HttpStatusCode.BadRequest, message, ex);
+            }
+            catch
+            {
+                string message = _resourceManager.GetString("InternalServerError", new System.Globalization.CultureInfo(language));
+                return Request.CreateErrorResponse(HttpStatusCode.InternalServerError, message);
             }
         }
 
@@ -107,17 +149,24 @@ namespace UserManagement.Controllers
         /// Deletes a user by ID.
         /// </summary>
         [HttpDelete]
-        [Route("api/user/{id}")]
-        public HttpResponseMessage Delete(int id)
+        [Route("user/{id}")]
+        public HttpResponseMessage Delete(int id, string language = "en")
         {
             try
             {
-                _userRepository.Delete(id);
-                return Request.CreateResponse(HttpStatusCode.OK);
+                _userService.DeleteUser(id);
+                string message = _resourceManager.GetString("UserDeleted", new System.Globalization.CultureInfo(language));
+                return Request.CreateResponse(HttpStatusCode.OK, message);
             }
             catch (ArgumentException ex)
             {
-                return Request.CreateErrorResponse(HttpStatusCode.NotFound, ex.Message);
+                string message = _resourceManager.GetString("BadRequest", new System.Globalization.CultureInfo(language));
+                return Request.CreateErrorResponse(HttpStatusCode.BadRequest, message, ex);
+            }
+            catch
+            {
+                string message = _resourceManager.GetString("InternalServerError", new System.Globalization.CultureInfo(language));
+                return Request.CreateErrorResponse(HttpStatusCode.InternalServerError, message);
             }
         }
 
